@@ -1,0 +1,28 @@
+{
+  "name": "va-docs-mcp",
+  "version": "1.0.0",
+  "description": "MCP server for VA.gov documentation",
+  "main": "build/index.js",
+  "type": "module",
+  "bin": {
+    "va-docs-mcp": "./build/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx src/index.ts",
+    "prepare": "npm run build"
+  },
+  "keywords": ["mcp", "va", "documentation"],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.13.3",
+    "glob": "^11.0.0",
+    "gray-matter": "^4.0.3"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "tsx": "^4.7.0",
+    "typescript": "^5.3.3"
+  }
+}
