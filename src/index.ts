@@ -8,7 +8,7 @@ import {
   ToolSchema
 } from '@modelcontextprotocol/sdk/types.js';
 import { findVaDocsRepo } from './utils/paths.js';
-import { findDocuments, parseDocument, searchDocuments, Document } from './utils/docs.js';
+import { findDocuments, parseDocument, searchDocuments, buildRelationshipIndex, Document } from './utils/docs.js';
 
 class VaDocsMcpServer {
   private server: Server;
@@ -50,8 +50,12 @@ class VaDocsMcpServer {
     this.documents = files
       .map(file => parseDocument(file, this.docsPath))
       .filter((doc): doc is Document => doc !== null);
+    
+    console.error(`Loaded ${this.documents.length} documents, building relationships...`);
+    buildRelationshipIndex(this.documents);
+    
     this.documentsLoaded = true;
-    console.error(`Loaded ${this.documents.length} documents`);
+    console.error(`Finished loading with relationships indexed`);
   }
 
   private setupHandlers() {
@@ -79,6 +83,19 @@ class VaDocsMcpServer {
               include_full_content: {
                 type: 'boolean',
                 description: 'Include full document content in results (default: false)'
+              },
+              context: {
+                type: 'string',
+                description: 'Search context to improve relevance (e.g., "new developer", "API integration", "troubleshooting")'
+              },
+              document_types: {
+                type: 'array',
+                items: { type: 'string' },
+                description: 'Filter by document types (e.g., ["guide", "api-docs", "setup-guide"])'
+              },
+              exclude_outdated: {
+                type: 'boolean',
+                description: 'Exclude potentially outdated documentation (default: false)'
               }
             },
             required: ['query']
@@ -115,8 +132,23 @@ class VaDocsMcpServer {
 
       switch (request.params.name) {
         case 'search_docs': {
-          const { query, category, limit = 10, include_full_content = false } = request.params.arguments as any;
-          const results = searchDocuments(this.documents, query, { category, limit });
+          const { 
+            query, 
+            category, 
+            limit = 10, 
+            include_full_content = false,
+            context,
+            document_types,
+            exclude_outdated = false
+          } = request.params.arguments as any;
+          
+          const results = searchDocuments(this.documents, query, { 
+            category, 
+            limit,
+            context,
+            documentTypes: document_types,
+            excludeOutdated: exclude_outdated
+          });
           
           return {
             content: [{
@@ -133,6 +165,8 @@ class VaDocsMcpServer {
                   keySections: doc.keySections,
                   estimatedReadTime: doc.estimatedReadTime,
                   lastModified: doc.lastModified,
+                  relationships: doc.relationships,
+                  internalLinks: doc.internalLinks,
                   excerpt: include_full_content ? undefined : doc.content.substring(0, 200) + '...',
                   content: include_full_content ? doc.content : undefined,
                   frontmatter: include_full_content ? doc.frontmatter : undefined
@@ -162,6 +196,9 @@ class VaDocsMcpServer {
                 keySections: doc.keySections,
                 estimatedReadTime: doc.estimatedReadTime,
                 lastModified: doc.lastModified,
+                relationships: doc.relationships,
+                internalLinks: doc.internalLinks,
+                externalReferences: doc.externalReferences,
                 frontmatter: doc.frontmatter,
                 content: doc.content
               }, null, 2)
