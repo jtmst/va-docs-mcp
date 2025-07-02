@@ -572,3 +572,88 @@ function inferImplicitRelationships(doc: Document, docMap: Map<string, Document>
     }
   }
 }
+
+export interface RelatedDocuments {
+  prerequisites?: DocumentSummary[];
+  followUps?: DocumentSummary[];
+  seeAlso?: DocumentSummary[];
+  dependents?: DocumentSummary[];
+}
+
+export interface DocumentSummary {
+  path: string;
+  title: string;
+  summary?: string;
+  documentType?: string;
+  estimatedReadTime?: number;
+  category?: string;
+}
+
+export function resolveRelatedDocuments(
+  doc: Document, 
+  allDocuments: Document[], 
+  maxPerType: number = 3
+): RelatedDocuments {
+  const docMap = new Map<string, Document>();
+  allDocuments.forEach(d => {
+    docMap.set(d.relativePath, d);
+    // Also index without .md extension for easier matching
+    const pathWithoutExt = d.relativePath.replace(/\.md$/, '');
+    docMap.set(pathWithoutExt, d);
+  });
+
+  const related: RelatedDocuments = {};
+
+  if (!doc.relationships) {
+    return related;
+  }
+
+  // Resolve prerequisites
+  if (doc.relationships.prerequisites && doc.relationships.prerequisites.length > 0) {
+    related.prerequisites = doc.relationships.prerequisites
+      .slice(0, maxPerType)
+      .map(path => findDocumentByPath(path, docMap))
+      .filter((d): d is Document => d !== null)
+      .map(d => createDocumentSummary(d));
+  }
+
+  // Resolve follow-ups
+  if (doc.relationships.followUps && doc.relationships.followUps.length > 0) {
+    related.followUps = doc.relationships.followUps
+      .slice(0, maxPerType)
+      .map(path => findDocumentByPath(path, docMap))
+      .filter((d): d is Document => d !== null)
+      .map(d => createDocumentSummary(d));
+  }
+
+  // Resolve see-also
+  if (doc.relationships.seeAlso && doc.relationships.seeAlso.length > 0) {
+    related.seeAlso = doc.relationships.seeAlso
+      .slice(0, maxPerType)
+      .map(path => findDocumentByPath(path, docMap))
+      .filter((d): d is Document => d !== null)
+      .map(d => createDocumentSummary(d));
+  }
+
+  // Resolve dependents (documents that reference this one)
+  if (doc.relationships.dependents && doc.relationships.dependents.length > 0) {
+    related.dependents = doc.relationships.dependents
+      .slice(0, maxPerType)
+      .map(path => findDocumentByPath(path, docMap))
+      .filter((d): d is Document => d !== null)
+      .map(d => createDocumentSummary(d));
+  }
+
+  return related;
+}
+
+function createDocumentSummary(doc: Document): DocumentSummary {
+  return {
+    path: doc.relativePath,
+    title: doc.title,
+    summary: doc.summary,
+    documentType: doc.documentType,
+    estimatedReadTime: doc.estimatedReadTime,
+    category: doc.category
+  };
+}

@@ -8,7 +8,7 @@ import {
   ToolSchema
 } from '@modelcontextprotocol/sdk/types.js';
 import { findVaDocsRepo } from './utils/paths.js';
-import { findDocuments, parseDocument, searchDocuments, buildRelationshipIndex, Document } from './utils/docs.js';
+import { findDocuments, parseDocument, searchDocuments, buildRelationshipIndex, resolveRelatedDocuments, Document } from './utils/docs.js';
 
 class VaDocsMcpServer {
   private server: Server;
@@ -110,6 +110,10 @@ class VaDocsMcpServer {
               path: {
                 type: 'string',
                 description: 'Relative path to the document (e.g., "products/health-care/appointments/README.md")'
+              },
+              include_related: {
+                type: 'boolean',
+                description: 'Include related documents (prerequisites, follow-ups, see-also) in the response (default: false)'
               }
             },
             required: ['path']
@@ -177,31 +181,41 @@ class VaDocsMcpServer {
         }
 
         case 'get_document': {
-          const { path } = request.params.arguments as any;
+          const { path, include_related = false } = request.params.arguments as any;
           const doc = this.documents.find(d => d.relativePath === path);
           
           if (!doc) {
             throw new Error(`Document not found: ${path}`);
           }
           
+          const responseData: any = {
+            path: doc.relativePath,
+            title: doc.title,
+            category: doc.category,
+            summary: doc.summary,
+            documentType: doc.documentType,
+            keySections: doc.keySections,
+            estimatedReadTime: doc.estimatedReadTime,
+            lastModified: doc.lastModified,
+            relationships: doc.relationships,
+            internalLinks: doc.internalLinks,
+            externalReferences: doc.externalReferences,
+            frontmatter: doc.frontmatter,
+            content: doc.content
+          };
+          
+          // Include related documents if requested
+          if (include_related) {
+            const relatedDocs = resolveRelatedDocuments(doc, this.documents);
+            if (Object.keys(relatedDocs).length > 0) {
+              responseData.related_documents = relatedDocs;
+            }
+          }
+          
           return {
             content: [{
               type: 'text',
-              text: JSON.stringify({
-                path: doc.relativePath,
-                title: doc.title,
-                category: doc.category,
-                summary: doc.summary,
-                documentType: doc.documentType,
-                keySections: doc.keySections,
-                estimatedReadTime: doc.estimatedReadTime,
-                lastModified: doc.lastModified,
-                relationships: doc.relationships,
-                internalLinks: doc.internalLinks,
-                externalReferences: doc.externalReferences,
-                frontmatter: doc.frontmatter,
-                content: doc.content
-              }, null, 2)
+              text: JSON.stringify(responseData, null, 2)
             }]
           };
         }
