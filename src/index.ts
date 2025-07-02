@@ -75,6 +75,10 @@ class VaDocsMcpServer {
               limit: {
                 type: 'number',
                 description: 'Maximum number of results (default: 10)'
+              },
+              include_full_content: {
+                type: 'boolean',
+                description: 'Include full document content in results (default: false)'
               }
             },
             required: ['query']
@@ -111,7 +115,7 @@ class VaDocsMcpServer {
 
       switch (request.params.name) {
         case 'search_docs': {
-          const { query, category, limit = 10 } = request.params.arguments as any;
+          const { query, category, limit = 10, include_full_content = false } = request.params.arguments as any;
           const results = searchDocuments(this.documents, query, { category, limit });
           
           return {
@@ -124,7 +128,14 @@ class VaDocsMcpServer {
                   path: doc.relativePath,
                   title: doc.title,
                   category: doc.category,
-                  excerpt: doc.content.substring(0, 200) + '...'
+                  summary: doc.summary,
+                  documentType: doc.documentType,
+                  keySections: doc.keySections,
+                  estimatedReadTime: doc.estimatedReadTime,
+                  lastModified: doc.lastModified,
+                  excerpt: include_full_content ? undefined : doc.content.substring(0, 200) + '...',
+                  content: include_full_content ? doc.content : undefined,
+                  frontmatter: include_full_content ? doc.frontmatter : undefined
                 }))
               }, null, 2)
             }]
@@ -146,6 +157,11 @@ class VaDocsMcpServer {
                 path: doc.relativePath,
                 title: doc.title,
                 category: doc.category,
+                summary: doc.summary,
+                documentType: doc.documentType,
+                keySections: doc.keySections,
+                estimatedReadTime: doc.estimatedReadTime,
+                lastModified: doc.lastModified,
                 frontmatter: doc.frontmatter,
                 content: doc.content
               }, null, 2)
